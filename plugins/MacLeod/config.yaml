@@ -1,0 +1,89 @@
+name:           MacLeod
+version:        1.0
+id:             MacLeod
+id:             MacLeod
+description:    There can be only one!
+author_name:    "Endevver, LLC"
+author_link:    http://www.endevver.com/
+plugin_link:    http://github.com/endevver/mt-plugin-macleod
+doc_link:       http://endevver.com/plugins/macleod
+
+# init_app: $MacLeod::MacLeod::Tool::BlogMerge::init_app
+
+# The list of classes that require specific orders and/or special instructions.
+# Every other class will have the order of '500'.
+merge_instructions:
+    # The first eight are child classes of blog objects 
+    trackback:
+        order: 510
+    objecttag:
+        order: 510
+    objectscore:
+        order: 510
+    objectasset:
+        order: 510
+    # Ping should be merged up after Trackback.
+    tbping:
+         order: 520
+    ping:
+         order: 520
+    # Comment should be merged up after TBPing
+    # because saving a comment ultimately triggers
+    # MT::TBPing::save.
+    comment:
+         order: 530
+    # Templates, categories and permissions are currently skipped by default.
+    # but contain an order if specified for merge by command-line options
+    template:
+        skip: 1
+    templatemap:
+        skip: 1
+        order: 510
+    category:
+        skip: 1
+        order: 510
+    folder:
+        skip: 1
+        order: 510
+    placement:
+        skip: 1
+        order: 520
+    ping_cat:
+        skip: 1
+        order: 520
+    # Association and permission classes can be enabled w/ the --perms flag
+    association:
+        skip: 1
+        order: 540
+    permission:
+        skip: 1
+        order: 550
+    # These are never merged
+    blog:
+        skip: 1
+    commenter:
+        skip: 1
+    user:
+        skip: 1
+    author:
+        skip: 1
+    role:
+        skip: 1
+    session:
+        skip: 1
+    config:
+        skip: 1
+    fileinfo:
+        skip: 1
+    ts_job:
+        skip: 1
+    ts_error:
+        skip: 1
+    ts_exitstatus:
+        skip: 1
+    ts_funcmap:
+        skip: 1
+    touch:
+        skip: 1
+    group:
+        skip: 1
