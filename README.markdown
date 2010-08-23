@@ -18,8 +18,7 @@ The main reason for developing this tool was to handle blog consolidation and su
 
 * Designed to search for, discover and intelligently facilitate the transfer of data from arbitrary object types and classes (e.g. data from third-party plugins).
 
-* Brief and lengthy documentation on the command line via the `help` and `man` flags
-
+* Brief and lengthy documentation of the [command line utility](http://github.com/endevver/mt-plugin-macleod/blob/master/plugins/MacLeod/tools/merge-blogs) via the `help` and `man` flags
 
 ## Installation ##
 
@@ -38,12 +37,12 @@ There is no web interface for the plugin as everything is currently done entirel
 
 The following plugins/utilities are required for proper operation:
 
-* Log4MT  - http://github.com/endevver/mt-plugin-log4mt
-* CLITool - http://github.com/endevver/mt-util-clitool
+* [Log4MT](http://github.com/endevver/mt-plugin-log4mt) - Used for general purpose logging and recording of entry permalink redirects
+* [CLITool](http://github.com/endevver/mt-util-clitool) - Underlying framework for all of Endevver's command-line interface (CLI) tools
 
 ## Limitations ##
 
-The only blog-specific content not currently handled is:
+You can see a full list of the data types **not handled** by the system in the [config.yaml](http://github.com/endevver/mt-plugin-macleod/blob/master/plugins/MacLeod/config.yaml).  In general, the only blog-specific content not currently handled is:
 
 * **Categories** - `MT::Category` and `MT::Placement` records.  This is currently pending functionality which will be added in the future
 * **Templates** - `MT::Template` and `MT::TemplateMap` records. This was omitted because we questioned the need for it.  The new blog already has templates and we believe that most users would not want to move all of the templates *en masse* into the target blog.  We may develop a method to easily migrate selected templates upon users' requests.
