@@ -1,12 +1,12 @@
 name:           MacLeod
-version:        1.0
+version:        1.0.1
 id:             MacLeod
 id:             MacLeod
 description:    There can be only one!
 author_name:    "Endevver, LLC"
 author_link:    http://www.endevver.com/
 plugin_link:    http://github.com/endevver/mt-plugin-macleod
-doc_link:       http://endevver.com/plugins/macleod
+# doc_link:       http://endevver.com/plugins/macleod
 
 # init_app: $MacLeod::MacLeod::Tool::BlogMerge::init_app
 

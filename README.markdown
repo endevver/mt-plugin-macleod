@@ -1,8 +1,12 @@
 # MacLeod plugin for Movable Type #
 
-This plugin facilitates the merging of two blogs in a "winner takes all" fashion in which a target blog literally absorbs content and author associations/permissions from another.  This renders the source blog a mostly empty, useless shell. (*"There can be only one"*).
+This plugin facilitates the process of blog consolidation in which one blog's content/associations are transferred entirely to another
+
+merging of two blogs in a "winner takes all" fashion in which a target blog literally absorbs content and author associations/permissions from another.  This renders the source blog a mostly empty, useless shell.
 
 The main reason for developing this tool was to handle blog consolidation and subsequent retiring of the absorbed blog as a separate entity.  For that reason, this tool was developed to change as little as possible in the underlying data, intelligently update the `blog_id`s of child classes instead of creating a new record via a clone.
+
+Though it seems inconceivable that an explanation would be necessary, the name of the plugin is a [Highlander](http://en.wikipedia.org/wiki/Highlander_(film)) reference. *There can be only one!*
 
 ## Features ##
 
@@ -51,6 +55,10 @@ You can see a full list of the data types **not handled** by the system in the [
 ## Help, Bugs and Feature Requests ##
 
 If you are having problems installing or using the plugin, please check out our general knowledge base and help ticket system at [help.endevver.com](http://help.endevver.com).
+
+## Future Plans ##
+
+This plugin was quickly put together to satisfy a single use case for a client.  In the future, it will certainly be expanded (and properly named) to facilitate mobility of individual pieces of content, all objects from individual object classes (e.g. templates, categories, associations, etc) and metadata between blogs.
 
 ## Copyright ##
 

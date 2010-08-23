@@ -34,7 +34,8 @@ EOD
 sub help { q{ This is a blog merging script } }
 
 sub option_spec {
-    return ( 'dryrun|d', 'perms|p', 'force|f', $_[0]->SUPER::option_spec() );
+    return ( 'dryrun|d', 'perms|p', 'force|f',
+               $_[0]->SUPER::option_spec()    );
 }
 
 
@@ -60,7 +61,8 @@ sub init_options {
 
     if ( $opt->{perms} ) {
         my $inst = $app->registry('merge_instructions');
-        print 'BEFORE $inst->{association}{skip}: '.$inst->{association}{skip}."\n";
+        print 'BEFORE $inst->{association}{skip}: '
+              .$inst->{association}{skip}."\n";
         delete $inst->{association}{skip};
         delete $inst->{permission}{skip};
         # print 'AFTER $inst->{association}{skip}: '.$inst->{association}{skip}."\n";
@@ -120,7 +122,8 @@ sub merge_blog_data {
                 if ( ($obj_cnt % 100) == 0 ) {
                     $app->print($obj_cnt.' ');
                 }
-                $obj->merge_operation( $src, $target ) unless $opt->{dryrun};
+                $obj->merge_operation( $src, $target )
+                    unless $opt->{dryrun};
             }
 
             # Final reporting for object type
@@ -237,7 +240,8 @@ sub _create_obj_to_merge {
         };
     }
     else {
-        push @$obj_to_merge, $pkg->_default_terms_args($class, $blog_id, $order);
+        push @$obj_to_merge, 
+            $pkg->_default_terms_args($class, $blog_id, $order);
     }
 
     $populated->{$class} = 1;
@@ -287,9 +291,24 @@ sub merge_operation {
     $obj->save or warn "Save error: ".$obj->errstr;
     $obj->clear_cache();
     my $newlink = $obj->permalink;
-    ###l4p $logger->info( "REDIRECT URL: $oldlink $newlink" );
+    ###l4p $logger->info( "ENTRY REDIRECT URL: $oldlink $newlink" )
+    ###l4p      if $oldlink ne $newlink;
 }
 
+
+package MT::Asset;
+
+sub merge_operation {
+    my ( $obj, $src, $target ) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    my $oldlink = $obj->url;
+    $obj->blog_id( $target->id );
+    $obj->save or warn "Save error: ".$obj->errstr;
+    $obj->clear_cache();
+    my $newlink = $obj->url;
+    ###l4p $logger->info( "ASSET REDIRECT URL: $oldlink $newlink" )
+    ###l4p      if $oldlink ne $newlink;
+}
 
 package MT::Association;
 
@@ -298,9 +317,8 @@ sub merge_operation {
     my $holder = $obj->user() || $obj->group();
     my $role   = $obj->role();
     MT::Association->unlink( $holder, $role, $src );
-    MT::Association->link(   $holder, $role, $target )->rebuild_permissions();
+    MT::Association->link( $holder, $role, $target)->rebuild_permissions();
 }
-
 
 package MT::Permission;
 

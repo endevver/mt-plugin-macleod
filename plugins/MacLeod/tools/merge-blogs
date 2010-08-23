@@ -11,11 +11,14 @@ merge-blogs - Transfer content/associations from one blog to another
 
 =head1 VERSION
 
-This documentation refers to merge-blogs version 0.9.0.
+This documentation refers to merge-blogs version 1.0.1. You can always find
+the latest version of the plugin and documentation at:
+
+  http://github.com/endevver/mt-plugin-macleod
 
 =head1 SYNOPSIS
 
-Usage: $0 [options] SRC_BLOG TARGET_BLOG
+Usage: merge-blogs [options] SRC_BLOG TARGET_BLOG
 
 Options:
     --perms     Migrate user/group associations (i.e. permissions)
@@ -26,56 +29,166 @@ Options:
     --help      Output this message
 
 Example:   
-    cd $MT_HOME
-    ./plugins/MacLeod/tools/merge-blogs --dryrun SOURCE_BLOG DEST_BLOG
-
+    cd /path/to/mt_dir
+    export MT_HOME="$(pwd)"
+    mysqldump [options] DATABASE > mt-DATABASE-backup.sql
+    ./plugins/MacLeod/tools/merge-blogs --dryrun --perms \
+        SOURCE_BLOG DEST_BLOG
 
 =head1 DESCRIPTION
 
-A full description of the module and its features.
+For a high-level overview of this plugin and command-line utility, please see:
 
-May include numerous subsections (i.e., =head2, =head3, etc.).
+  http://github.com/endevver/mt-plugin-macleod#readme
 
-=head1 SUBROUTINES/METHODS
+=head2 IMPORTANT CAVEATS
 
-A separate section listing the public components of the module's interface.
+This is an B<extremely powerful utility> with absolutely no facility for
+rollback. Although we believe it to be entirely reliable, even the
+developers of this plugin back up their database before running it or any
+utility of its kind. If you don't back up your database and it gets hosed
+because of a bug or because you accidentally selected the wrong options,
+there's really only one person to blame and it's not the creator of this
+software.
 
-These normally consist of either subroutines that may be exported, or methods
-that may be called on objects belonging to the classes that the module
-provides.
+We also suggest that you use the C<--dryrun> flag first before executing
+the utility without it because it serve to provide you with both some
+familiarity with the command's actions as well as possible illuminate a
+mistake you have made in omitting or including certain flags.
 
-Name the section accordingly.
+=head1 OPTIONS
 
-In an object-oriented module, this section should begin with a sentence (of the
-form "An object of this class represents ...") to give the reader a high-level
-context to help them understand the methods that are subsequently described.
+The following command-line options are supported by the utility.
+
+=over 4
+
+=item --perms
+
+Along with other blog content and metadata, this flag directs the utility
+to migrate all of the source blog's user/group associations (i.e.
+permissions) to the target blog resulting in a logical union of users and
+their abilities.
+
+For example, given the following users and roles on the source blog:
+
+  User A - Blog admin
+  User B - Designer, Commenter
+
+And the following on the target blog:
+
+  User B - Author, Commenter
+  User C - Blog admin, Editor, Author, Commenter, Editor
+
+Use of the --perms flag would result in the following on the target blog:
+
+  User A - Blog admin
+  User B - Author, Designer, Commenter
+  User C - Blog admin, Editor, Author, Commenter, Editor
+
+Although this is incredibly useful, it was intentionally left as an option
+because of the potential for accidents (e.g. unintentional granting of user
+access to the new blog and permissions escalation like in the case of User
+A who just became blog admin of a blog they didn't have access to before)
+
+=item --dryrun
+
+Carries out the actions specified by the flags and arguments provided on
+the command line but makes no modifications to the database.
+
+=item --force
+
+Normally, the utility will output exactly what it's about to do and then
+prompt you for confirmation that you want to continue.  The C<--force>
+flag skips this confirmation and simply performs the action specified
+by the provided flags and arguments.
+
+=item --verbose
+
+Output more progress information
+
+=item --man
+
+Output this man-formatted POD documentation.
+
+=item --help
+
+Outputs a short description of the utility's usage
+
+=back
+
+=head1 DESCRIPTION OF OPERATION
+
+During execution, this utility does two main things:
+
+=over 4
+
+=item 1. MT object type and dependency tree discovery
+
+=item 2. Object migration from source blog to target blog
+
+=back
+
+=head2 OBJECT TYPE AND DEPENDENCY TREE DISCOVERY
+
+The utility first searches the MT registry for all MT::Object subclasses 
+that are blog-specific.  This is significant because it enables the plugin
+to work with arbitrary object classes and their datasources controlled by
+third-party plugins or even future versions of Melody and MT.
+
+The utility then takes that list and creates a dependency tree defining
+which objects are parents or children of other objects.  This provides
+an order for processing each object to minimize the length of time dependent
+objects are orphaned.
+
+=head2 INTER-BLOG OBJECT MIGRATION
+
+Iterating over the ordered list of object types/classes found above, the
+utility requests a database iterator for all objects of the object class in
+context which are associated (by blog ID) to the source blog.  Each object
+returned from the database iterator is processed by the object class'
+C<merge_operation()> method, inherited from MT::Object or overridden to
+provide custom functionality.
+
+The default method (exported to MT::Object by this plugin) simply updates
+the C<blog_id> column from the old source blog's value to that of the
+target blog and saves the object.
+
+This plugin overrides the method for the C<MT::Entry>, C<MT::Asset>,
+C<MT::Association> and C<MT::Permission> classes to implement special
+handling like extra logging of permalink and asset URL changes or
+permission re-assignment which is not as straightforward as updating a blog
+ID.
 
 =head1 DIAGNOSTICS
 
-A list of every error and warning message that the module can generate (even
-the ones that will "never happen"), with a full explanation of each problem,
-one or more likely causes, and any suggested remedies.
+A list of every error and warning message that the module can generate
+(even the ones that will "never happen"), with a full explanation of each
+problem, one or more likely causes, and any suggested remedies.
 
 =head1 CONFIGURATION AND ENVIRONMENT
 
-A full explanation of any configuration system(s) used by the module, including
-the names and locations of any configuration files, and the meaning of any
-environment variables or properties that can be set. These descriptions must
-also include details of any configuration language used.
+A full explanation of any configuration system(s) used by the module,
+including the names and locations of any configuration files, and the
+meaning of any environment variables or properties that can be set. These
+descriptions must also include details of any configuration language used.
 
 =head1 DEPENDENCIES
 
-A list of all of the other modules that this module relies upon, including any
-restrictions on versions, and an indication of whether these required modules
-are part of the standard Perl distribution, part of the module's distribution,
-or must be installed separately.
+=over 4
+
+=item * Log4MT plugin - http://github.com/endevver/mt-plugin-log4mt
+
+Used for general purpose logging and recording of entry permalink redirects
+
+=item * CLITool - http://github.com/endevver/mt-util-clitool
+
+Underlying framework for all of Endevver's command-line interface (CLI) tools
+
+=back
 
 =head1 INCOMPATIBILITIES
 
-A list of any modules that this module cannot be used in conjunction with.
-This may be due to name conflicts in the interface, or competition for system
-or program resources, or due to internal limitations of Perl (for example, many
-modules that use source code filters are mutually incompatible).
+No known incompatibilities.
 
 =head1 BUGS AND LIMITATIONS
 
@@ -90,23 +203,24 @@ This utility does not transfer the following during a merge:
 There are no known bugs in this module.  
 
 If you are having problems installing or using the plugin, please check out 
-our general knowledge base and help ticket system at 
-[help.endevver.com](http://help.endevver.com).
+our general knowledge base and help ticket system:
 
-## Copyright ##
+  http://help.endevver.com
+
+=head1 COPYRIGHT
 
 Copyright 2010, Endevver, LLC. All rights reserved.
 
-## License ##
+=head1 LICENSE
 
 This plugin is licensed under the GPL v2.
 
-# About Endevver #
+=head1 ABOUT ENDEVVER
 
 We design and develop web sites, products and services with a focus on 
 simplicity, sound design, ease of use and community. We specialize in 
 Movable Type and offer numerous services and packages to help customers 
 make the most of this powerful publishing platform.
 
-http://www.endevver.com/
+http://endevver.com/
 
