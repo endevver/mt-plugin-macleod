@@ -67,14 +67,17 @@ sub init_options {
         delete $inst->{permission}{skip};
         # print 'AFTER $inst->{association}{skip}: '.$inst->{association}{skip}."\n";
         
-        unless ( $opt->{dryrun} ) {
+        if ( $opt->{dryrun} ) {
+            $opt->{verbose} = 1;
+        }
+        else {
             my $cb = sub { 
-                ###l4p $logger->debug('In TakeDown callback removing old blog perms');
+                ###l4p $logger->info('In TakeDown callback removing old blog perms');
                 $app->model('permission')->remove({
                     blog_id => $opt->{srcblog}->id
                 });
             };
-            ###l4p $logger->debug('Adding TakeDown callback for removing permissions from old blog');
+            ###l4p $logger->info('Adding TakeDown callback for removing permissions from old blog');
             MT->add_callback( 'take_down', 1, $app, $cb );
         }
     }
@@ -96,24 +99,29 @@ sub mode_default {
     my $continue = $opt->{force};
     $continue  ||= $app->confirm_merge_blog_data( $obj_to_merge, 
                                                   $src, $target );
-
+    my $out;
     if ( $continue ) {
         $app->merge_blog_data( $obj_to_merge, $src, $target );
+        $out = 'You can find a list of asset and entry redirects '
+             . 'by filtering your log4mt logfile for the phrase '
+             . '"REDIRECT URL"';
+        return "All requested merge operations complete. $out";
     }
     else {
-        $app->print("Merge of blog data aborted\n");
+        return "Merge of blog data aborted";
     }
 
-    return "All requested merge operations complete";
 }
 
 sub merge_blog_data {
     my ( $app, $obj_to_merge, $src, $target ) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $opt = $app->options();
     
     foreach my $objhash ( @$obj_to_merge ) {
         while ( my ($class, $loadargs) = each %$objhash ) {
             $app->print("Upgrading $class objects: ");
+            $logger->info("Upgrading $class objects: ");
             my $obj_cnt = 0;
             my $iter = $class->load_iter(   $loadargs->{terms},
                                             $loadargs->{args}   );
@@ -127,14 +135,13 @@ sub merge_blog_data {
             }
 
             # Final reporting for object type
-            if ( $obj_cnt ) {
-                $app->print( "$obj_cnt records "
-                           . ($opt->{dryrun} ? 'would be ' : '')
-                           . "modified\n");
-            }
-            else {
-                $app->print("None\n");
-            }
+            my $final_msg
+                =  $obj_cnt ?   "  $obj_cnt records "
+                              . ($opt->{dryrun} ? 'would be ' : '')
+                              . 'modified'
+                            : 'None';
+            $app->print("$final_msg\n");
+            $logger->info("$final_msg\n");
         }
     }
 }
@@ -277,7 +284,12 @@ package MT::Object;
 sub merge_operation {
     my ( $obj, $src, $target ) = @_;
     $obj->blog_id( $target->id );
-    $obj->save or warn "Save error: ".$obj->errstr;
+    unless ( $obj->save ) {
+        $logger ||= MT::Log::Log4perl->new();
+        $logger->logerror(
+            sprintf "Save error for %s object: ", ref $obj, $obj->errstr
+        );
+    }
 }
 
 
@@ -285,14 +297,20 @@ package MT::Entry;
 
 sub merge_operation {
     my ( $obj, $src, $target ) = @_;
-    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $oldlink = $obj->permalink;
     $obj->blog_id( $target->id );
-    $obj->save or warn "Save error: ".$obj->errstr;
+    unless ( $obj->save ) {
+        $logger ||= MT::Log::Log4perl->new();
+        $logger->logerror(
+            sprintf "Save error for %s object: ", ref $obj, $obj->errstr
+        );
+    }
     $obj->clear_cache();
     my $newlink = $obj->permalink;
-    ###l4p $logger->info( "ENTRY REDIRECT URL: $oldlink $newlink" )
-    ###l4p      if $oldlink ne $newlink;
+    if ( $oldlink ne $newlink ) {
+        $logger ||= MT::Log::Log4perl->new();
+        $logger->info( "ENTRY REDIRECT URL: $oldlink $newlink" );
+    }
 }
 
 
@@ -300,14 +318,20 @@ package MT::Asset;
 
 sub merge_operation {
     my ( $obj, $src, $target ) = @_;
-    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $oldlink = $obj->url;
     $obj->blog_id( $target->id );
-    $obj->save or warn "Save error: ".$obj->errstr;
+    unless ( $obj->save ) {
+        $logger ||= MT::Log::Log4perl->new();
+        $logger->logerror(
+            sprintf "Save error for %s object: ", ref $obj, $obj->errstr
+        );
+    }
     $obj->clear_cache();
     my $newlink = $obj->url;
-    ###l4p $logger->info( "ASSET REDIRECT URL: $oldlink $newlink" )
-    ###l4p      if $oldlink ne $newlink;
+    if ( $oldlink ne $newlink ) {
+        $logger ||= MT::Log::Log4perl->new();
+        $logger->info( "ASSET REDIRECT URL: $oldlink $newlink" );
+    }
 }
 
 package MT::Association;
