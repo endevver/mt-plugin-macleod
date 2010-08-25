@@ -42,15 +42,19 @@ merge_instructions:
     category:
         skip: 1
         order: 510
+        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     folder:
         skip: 1
         order: 510
+        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     placement:
         skip: 1
         order: 520
+        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     ping_cat:
         skip: 1
         order: 520
+        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     # Association and permission classes can be enabled w/ the --perms flag
     association:
         skip: 1

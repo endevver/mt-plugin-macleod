@@ -22,19 +22,22 @@ Usage: merge-blogs [options] SRC_BLOG TARGET_BLOG
 
 Options:
 
-  --perms     Migrate user/group associations (i.e. permissions)
-  --dryrun    Run through without modifying anything
-  --force     Don't prompt for confirmation of actions
-  --verbose   Output more progress information
-  --man       Output the man page for the utility
-  --help      Output this message
+  --perms      Also merge user/group associations (i.e. permissions)
+  --cats FILE  Also merge categories/folders, w/ optional CSV control file
+  --dryrun     Run through without modifying anything
+  --force      Don't prompt for confirmation of actions
+  --verbose    Output more progress information
+  --man        Output the man page for the utility
+  --help       Output this message
 
 Example:
 
   cd /path/to/mt_dir
   export MT_HOME="$(pwd)"
   mysqldump [options] DATABASE > mt-DATABASE-backup.sql
-  ./plugins/MacLeod/tools/merge-blogs --dryrun --perms \
+  ./plugins/MacLeod/tools/merge-blogs   \
+    --dryrun --perms                    \
+    --cats category_unification.csv     \
       SOURCE_BLOG DEST_BLOG
 
 =head1 DESCRIPTION
@@ -91,6 +94,72 @@ Although this is incredibly useful, it was intentionally left as an option
 because of the potential for accidents (e.g. unintentional granting of user
 access to the new blog and permissions escalation like in the case of User
 A who just became blog admin of a blog they didn't have access to before)
+
+=item --cats
+
+B<NOTE: THIS IS NOT IMPLEMENTED YET. It represents only possible future
+functionality.>
+
+Along with other blog content and metadata, this flag (with no argument
+specified) directs the utility to also migrate all of the source blog's
+categories AND folders as well as their associations with entries and
+pages to the target blog resulting in a logical union of categories with
+duplicate labels collapsed into the target blog's category
+
+For example, if the source blog has the following categories:
+
+  Cat A (basename: cat_a)
+  Cat B (basename: cat_b)
+  Cat C (basename: cat_c)
+
+And the target blog has the following:
+
+  Cat A (basename: category_a)
+  Cat D (basename: category_d)
+  Cat E (basename: category_e)
+
+The target blog will have the following after the merge:
+
+  Cat A (basename: category_a)
+  Cat B (basename: cat_b)
+  Cat C (basename: cat_c)
+  Cat D (basename: category_d)
+  Cat E (basename: category_e)
+
+=item --cats CSVFILE
+
+B<NOTE: This feature does not yet handle Folders and will gracefully
+exit if it detects Folders in either source or target blogs.>
+
+If the C<--cats> flag is followed by a file path to a CSV-formatted file,
+the system will use the file to inform the merge allowing you to completely
+control the final set of categories.  The CSV file should have the
+following fields:
+
+=over 4
+
+=item 1. Final category label (REQUIRED)
+
+=item 2. Existing category ID
+
+=item 3. Other category IDs to merge into this category
+
+If only the B<Final category label> is provided, the system checks the target blog first then the source blog.  The first exact match found becomes the merged blog's category of record for that label.  This is similar to the default behavior of the C<--cats> flag.
+
+If you want to reverse the functionality and specify that the B<source blog's> category should be the official category, you can specify its category ID in field two. Any category in the target blog with the identical label will be collapsed into it.
+
+As stated above, when no CSV file is provided, categories with the same label are collapsed into the target blog's category.  However, using a CSV file, you can B<reverse> that by including in field two the ID of the category in the B<source blog>.
+
+If the second field is null, the system will look for the category first in
+the target blog and then in the source blog.  If found in neither location,
+a new category with that label will be created.
+
+If an existing category ID B<is> specified in the second field, the third field is only necessary for merging in categories which do not have the same category label.
+
+Any category or folder in the source or target blogs not specified by label or ID in one of the three fields is deleted and will not appear in the merged blog
+
+
+=back
 
 =item --dryrun
 

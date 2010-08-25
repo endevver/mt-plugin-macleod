@@ -22,22 +22,22 @@ sub usage {
     return <<EOD;
 Usage: $0 [options] SRC_BLOG TARGET_BLOG
 Options:
-    --perms     Migrate user/group associations (i.e. permissions)
-    --dryrun    Run through without modifying anything
-    --force     Don't prompt for confirmation of actions
-    --verbose   Output more progress information
-    --man       Output the man page for the utility
-    --help      Output this message
+    --perms      Also merge user/group associations (i.e. permissions)
+    --cats FILE  Also merge categories/folders, w/ optional CSV control file
+    --dryrun     Run through without modifying anything
+    --force      Don't prompt for confirmation of actions
+    --verbose    Output more progress information
+    --man        Output the man page for the utility
+    --help       Output this message
 EOD
 }
 
 sub help { q{ This is a blog merging script } }
 
 sub option_spec {
-    return ( 'dryrun|d', 'perms|p', 'force|f',
+    return ( 'dryrun|d', 'perms|p', 'cats|c=s', 'force|f',
                $_[0]->SUPER::option_spec()    );
 }
-
 
 sub init_options {
     my $app = shift;
@@ -47,6 +47,9 @@ sub init_options {
 
     $app->SUPER::init_options(@_) or return;
     my $opt = $app->options || {};
+    my $inst = $app->registry('merge_instructions');
+
+    $opt->{verbose}++ if $opt->{dryrun};
 
     unless ( $opt->{srcblog} && $opt->{targetblog} ) {
         @ARGV == 2 or return $app->error(
@@ -59,18 +62,24 @@ sub init_options {
         return unless $opt->{srcblog} && $opt->{targetblog};
     }
 
+    if ( $opt->{cats} ) {
+        require Text::CSV;
+        my $csv = Text::CSV->new({ binary => 1 })  # should set binary attribute.
+            or die "Cannot use CSV: ".Text::CSV->error_diag ();
+        open my $fh, "<:encoding(utf8)", $opt->{cats}
+            or die $opt->{cats}.": $!";
+        $opt->{catcsv} = $fh;
+        delete $inst->{$_}{skip} foreach qw( category placement ping_cat );
+    }
+
     if ( $opt->{perms} ) {
-        my $inst = $app->registry('merge_instructions');
         print 'BEFORE $inst->{association}{skip}: '
               .$inst->{association}{skip}."\n";
         delete $inst->{association}{skip};
         delete $inst->{permission}{skip};
         # print 'AFTER $inst->{association}{skip}: '.$inst->{association}{skip}."\n";
         
-        if ( $opt->{dryrun} ) {
-            $opt->{verbose} = 1;
-        }
-        else {
+        unless ( $opt->{dryrun} ) {
             my $cb = sub { 
                 ###l4p $logger->info('In TakeDown callback removing old blog perms');
                 $app->model('permission')->remove({
@@ -110,18 +119,19 @@ sub mode_default {
     else {
         return "Merge of blog data aborted";
     }
-
 }
 
 sub merge_blog_data {
     my ( $app, $obj_to_merge, $src, $target ) = @_;
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
-    my $opt = $app->options();
-    
+    my $opt  = $app->options();
+    my $inst = $app->registry('merge_instructions');
+
     foreach my $objhash ( @$obj_to_merge ) {
         while ( my ($class, $loadargs) = each %$objhash ) {
             $app->print("Upgrading $class objects: ");
             $logger->info("Upgrading $class objects: ");
+
             my $obj_cnt = 0;
             my $iter = $class->load_iter(   $loadargs->{terms},
                                             $loadargs->{args}   );
@@ -217,9 +227,8 @@ sub _populate_obj_to_merge {
 sub _create_obj_to_merge {
     my $pkg = shift;
     my ($class, $blog_id, $obj_to_merge, $populated, $order) = @_;
-
     my $instructions = MT->registry('merge_instructions');
-    my $columns = $class->column_names;
+    my $columns      = $class->column_names;
     foreach my $column (@$columns) {
         if ( $column =~ /^(\w+)_id$/ ) {
             my $parent = $1;
@@ -275,6 +284,12 @@ sub _default_terms_args {
     }
 }
     
+sub handler_category {
+    die "Not yet implemented";
+    # my 
+    # $opt->{catcsv} = $fh;
+}
+
 
 1;
 
