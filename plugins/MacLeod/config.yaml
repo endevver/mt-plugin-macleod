@@ -23,8 +23,6 @@ merge_instructions:
     objectasset:
         order: 510
     # Ping should be merged up after Trackback.
-    tbping:
-         order: 520
     ping:
          order: 520
     # Comment should be merged up after TBPing
@@ -43,18 +41,9 @@ merge_instructions:
         skip: 1
         order: 510
         handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
-    folder:
-        skip: 1
-        order: 510
-        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     placement:
         skip: 1
         order: 520
-        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
-    ping_cat:
-        skip: 1
-        order: 520
-        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     # Association and permission classes can be enabled w/ the --perms flag
     association:
         skip: 1
@@ -62,6 +51,34 @@ merge_instructions:
     permission:
         skip: 1
         order: 550
+    # Object type aliases or variants (which we don't currently differentiate)
+    page:
+         skip: 1
+         alias: entry
+    folder:
+        skip: 1
+        alias: category
+    banlist:
+         skip: 1
+         alias: ipbanlist
+    tbping:
+         skip: 1
+         alias: ping
+    ping_cat:
+         skip: 1
+         alias: ping
+    file:
+         skip: 1
+         alias: asset
+    image:
+         skip: 1
+         alias: asset
+    video:
+         skip: 1
+         alias: asset
+    audio:
+         skip: 1
+         alias: asset
     # These are never merged
     blog:
         skip: 1

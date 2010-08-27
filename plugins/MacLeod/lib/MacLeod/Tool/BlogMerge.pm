@@ -127,6 +127,7 @@ sub merge_blog_data {
     my $opt  = $app->options();
     my $inst = $app->registry('merge_instructions');
 
+    $| = 1;
     foreach my $objhash ( @$obj_to_merge ) {
         while ( my ($class, $loadargs) = each %$objhash ) {
             $app->print("Upgrading $class objects: ");
@@ -176,12 +177,19 @@ sub confirm_merge_blog_data {
         delete $unhandled_classes{$hashclass};
     }
 
+    foreach my $uhclass ( sort keys %unhandled_classes ) {
+        my $props = $uhclass->properties() || {};
+        next unless $props->{class_type};
+        print "\t$uhclass\n" ;
+        delete $unhandled_classes{$uhclass};
+    }
+
     print "\nObjects of the following classes will NOT BE MIGRATED:\n";
-    foreach my $unhandled ( sort keys %unhandled_classes ) {
-        next unless $unhandled->has_column('blog_id');
-        print "\t$unhandled"
-        .($unhandled->has_column('blog_id') ? '' : ' -- no blog ID column')
-        ."\n";
+    foreach my $uhclass ( sort keys %unhandled_classes ) {
+        next unless $uhclass->has_column('blog_id');
+        printf "\t%s %s\n",
+            $uhclass, ($uhclass->has_column('blog_id') ? '' 
+                                                       : ' -- no blog ID column')
     }
 
     return $app->confirm_action(
@@ -198,23 +206,26 @@ sub _populate_obj_to_merge {
     my @object_hashes;
     my $types        = MT->registry('object_types');
     my $instructions = MT->registry('merge_instructions');
-    foreach my $key (keys %$types) {
-        next if $key =~ /\w+\.\w+/; # skip subclasses
-        my $class = MT->model($key);
-        next unless $class;
-        $classes_seen{$class} = 1;
-        next unless $class->has_column('blog_id');
-        next if exists($instructions->{$key})
-             && exists($instructions->{$key}{skip})
-             && $instructions->{$key}{skip};
-        next if exists $populated{$class};
-        my $order = exists($instructions->{$key})
-                 && exists($instructions->{$key}{order})
-            ? $instructions->{$key}{order}
-            : 500;
-        $pkg->_create_obj_to_merge(
-            $class, $blog_id, \@object_hashes, \%populated, $order);
+    foreach my $obj_type (keys %$types) {
+        next if $obj_type =~ /\w+\.\w+/; # skip subclasses
+        my $class             = MT->model( $obj_type );
+        next unless $class and $class->has_column('blog_id'); # Nothing to merge
+        $classes_seen{$class} = 1;                      # Note class for logging
+        my $type_inst         = $instructions->{$obj_type} || {};
+        my $order             = $type_inst->{order} ? $type_inst->{order} : 500;
+
+        # Skip object types marked as skip or those we've already dealt with
+        next if $type_inst->{skip} or exists $populated{"$class"};
+
+        my $terms_args = $class->can('merge_terms_args')
+                      || $pkg->can('merge_terms_args');
+        push @object_hashes, {
+            $class => $terms_args->( $blog_id ),
+            order  => $order
+        };
+        $populated{ $class } = 1;
     }
+
     @object_hashes = sort { $a->{order} <=> $b->{order} } @object_hashes;
     my @obj_to_merge;
     foreach my $hash ( @object_hashes ) {
@@ -224,64 +235,12 @@ sub _populate_obj_to_merge {
     return \@obj_to_merge;
 }
 
-sub _create_obj_to_merge {
-    my $pkg = shift;
-    my ($class, $blog_id, $obj_to_merge, $populated, $order) = @_;
-    my $instructions = MT->registry('merge_instructions');
-    my $columns      = $class->column_names;
-    foreach my $column (@$columns) {
-        if ( $column =~ /^(\w+)_id$/ ) {
-            my $parent = $1;
-            my $p_class = MT->model($parent);
-            next unless $p_class;
-            $classes_seen{$p_class} = 1;
-            next unless $p_class->has_column('blog_id');
-            next if exists $populated->{$p_class};
-            next if exists($instructions->{$parent})
-                 && exists($instructions->{$parent}{skip})
-                 && $instructions->{$parent}{skip};
-            my $p_order = exists($instructions->{$parent})
-                       && exists($instructions->{$parent}{order})
-                ? $instructions->{$parent}{order}
-                : 500;
-            $pkg->_create_obj_to_merge(
-                $p_class, $blog_id, $obj_to_merge, $populated, $p_order);
-        }
-    }
-    
-    if ( $class->can('merge_terms_args') ) {
-        push @$obj_to_merge, {
-            $class  => $class->merge_terms_args($blog_id),
-            'order' => $order
-        };
-    }
-    else {
-        push @$obj_to_merge, 
-            $pkg->_default_terms_args($class, $blog_id, $order);
-    }
-
-    $populated->{$class} = 1;
-}
-
-sub _default_terms_args {
-    my $pkg = shift;
-    my ($class, $blog_id, $order) = @_;
-
-    if ($blog_id) {
-        return {
-            $class => {
-                terms => { 'blog_id' => $blog_id }, 
-                args => undef
-            },
-            'order' => $order,
-        };
-    }
-    else {
-        return {
-            $class  => { terms => undef, args => undef },
-            'order' => $order,
-        };
-    }
+sub merge_terms_args {
+    my ( $blog_id ) = @_;
+    return {
+        terms       => ($blog_id ? { blog_id => $blog_id } : ()),
+        args        => { no_class => 1 },
+    };
 }
     
 sub handler_category {
