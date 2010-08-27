@@ -130,29 +130,29 @@ sub merge_blog_data {
     $| = 1;
     foreach my $objhash ( @$obj_to_merge ) {
         while ( my ($class, $loadargs) = each %$objhash ) {
-            $app->print("Upgrading $class objects: ");
-            $logger->info("Upgrading $class objects: ");
+            my $total = $class->count( $loadargs->{terms},
+                                       $loadargs->{args}   );
+            my $line_header = ($opt->{dryrun} ? '(Mock)' : '')
+                            . "Upgrading $total $class objects";
+            $logger->info( $line_header );
 
             my $obj_cnt = 0;
             my $iter = $class->load_iter(   $loadargs->{terms},
                                             $loadargs->{args}   );
             while ( my $obj = $iter->() ) {
-                $obj_cnt++;
-                if ( ($obj_cnt % 100) == 0 ) {
-                    $app->print($obj_cnt.' ');
-                }
+                $app->print("\r$line_header: ".++$obj_cnt);
                 $obj->merge_operation( $src, $target )
                     unless $opt->{dryrun};
             }
 
             # Final reporting for object type
             my $final_msg
-                =  $obj_cnt ?   "  $obj_cnt records "
+                =  $obj_cnt ?   " records "
                               . ($opt->{dryrun} ? 'would be ' : '')
                               . 'modified'
-                            : 'None';
+                            : "$line_header: None";
             $app->print("$final_msg\n");
-            $logger->info("$final_msg\n");
+            $logger->info("$class results: $obj_cnt $final_msg\n");
         }
     }
 }
