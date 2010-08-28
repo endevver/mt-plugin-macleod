@@ -6,11 +6,12 @@ $VERSION = '1.0';
 
 use Pod::Usage;
 use File::Spec;
+use Data::Dumper;
 use MT::Util qw( caturl );
 use Cwd qw( realpath );
 
 use MT::Log::Log4perl qw(l4mtdump); use Log::Log4perl qw( :resurrect );
-###l4p our $logger = MT::Log::Log4perl->new();
+our $logger = MT::Log::Log4perl->new();
 
 use base qw( MT::App::CLI );
 # use MacLeod::Util;
@@ -24,6 +25,8 @@ Usage: $0 [options] SRC_BLOG TARGET_BLOG
 Options:
     --perms      Also merge user/group associations (i.e. permissions)
     --cats FILE  Also merge categories/folders, w/ optional CSV control file
+    --catscheck FILE  
+                 Skip all merge steps, test the category CSV map file then quit
     --dryrun     Run through without modifying anything
     --force      Don't prompt for confirmation of actions
     --verbose    Output more progress information
@@ -35,7 +38,7 @@ EOD
 sub help { q{ This is a blog merging script } }
 
 sub option_spec {
-    return ( 'dryrun|d', 'perms|p', 'cats|c=s', 'force|f',
+    return ( 'dryrun|d', 'perms|p', 'cats|c=s', 'catscheck=s', 'force|f',
                $_[0]->SUPER::option_spec()    );
 }
 
@@ -62,19 +65,27 @@ sub init_options {
         return unless $opt->{srcblog} && $opt->{targetblog};
     }
 
+    if ( $opt->{'catscheck'} ) {
+        $opt->{force} = $opt->{verbose} = $opt->{dryrun} = 1;
+        $opt->{cats} = $opt->{'catscheck'};
+        $inst->{$_}{skip} = 1 foreach keys %$inst;
+    }
+
     if ( $opt->{cats} ) {
         require Text::CSV;
-        my $csv = Text::CSV->new({ binary => 1 })  # should set binary attribute.
+        my $csv = Text::CSV->new({ binary => 1, eol => $/ })
             or die "Cannot use CSV: ".Text::CSV->error_diag ();
-        open my $fh, "<:encoding(utf8)", $opt->{cats}
+        open my $fh, "<", $opt->{cats}
             or die $opt->{cats}.": $!";
-        $opt->{catcsv} = $fh;
-        delete $inst->{$_}{skip} foreach qw( category placement ping_cat );
+        MT->add_callback( 'take_down', 1, $app, sub { close $fh } );
+        $opt->{csv} = $csv;
+        $opt->{csvfh} = $fh;
+        delete $inst->{$_}{skip} foreach qw( category placement );
     }
 
     if ( $opt->{perms} ) {
-        print 'BEFORE $inst->{association}{skip}: '
-              .$inst->{association}{skip}."\n";
+        # print 'BEFORE $inst->{association}{skip}: '
+        #       .$inst->{association}{skip}."\n";
         delete $inst->{association}{skip};
         delete $inst->{permission}{skip};
         # print 'AFTER $inst->{association}{skip}: '.$inst->{association}{skip}."\n";
@@ -129,30 +140,31 @@ sub merge_blog_data {
 
     $| = 1;
     foreach my $objhash ( @$obj_to_merge ) {
-        while ( my ($class, $loadargs) = each %$objhash ) {
-            my $total = $class->count( $loadargs->{terms},
-                                       $loadargs->{args}   );
+        while ( my ($class, $info) = each %$objhash ) {
+            next if $opt->{catscheck} and $class ne 'MT::Category'; # Check mode
+            my $obj_cnt = 0;
+            my $loader = [ $info->{terms}, $info->{args} ]; # Object loader
+
+            # Get the total object count for progress reporting
+            # and create a anonymous reporter function 
+            my $total = $class->blog_merge_handler( 'count', $loader );
             my $line_header = ($opt->{dryrun} ? '(Mock)' : '')
                             . "Upgrading $total $class objects";
+            my $reporter = sub { $app->print("\r$line_header: ".(shift)) };
             $logger->info( $line_header );
 
-            my $obj_cnt = 0;
-            my $iter = $class->load_iter(   $loadargs->{terms},
-                                            $loadargs->{args}   );
-            while ( my $obj = $iter->() ) {
-                $app->print("\r$line_header: ".++$obj_cnt);
-                $obj->merge_operation( $src, $target )
-                    unless $opt->{dryrun};
-            }
+            my $mode = $opt->{dryrun} ? 'merge-report' : 'merge';
+            $obj_cnt += $class->blog_merge_handler(
+                            $mode, $loader, $src, $target, $reporter );
 
             # Final reporting for object type
-            my $final_msg
-                =  $obj_cnt ?   " records "
-                              . ($opt->{dryrun} ? 'would be ' : '')
-                              . 'modified'
-                            : "$line_header: None";
-            $app->print("$final_msg\n");
-            $logger->info("$class results: $obj_cnt $final_msg\n");
+            $reporter->( $obj_cnt );
+            my $final_msg = sprintf(
+                "%s records%s modified",
+                ($obj_cnt||'No'), 
+                ($opt->{dryrun} ? ' would be' : ''));
+            $app->print("\r$line_header: $final_msg\n");
+            $logger->info("$class results: $final_msg");
         }
     }
 }
@@ -200,7 +212,8 @@ sub confirm_merge_blog_data {
 sub _populate_obj_to_merge {
     my $pkg = shift;
     my ($blog_id) = @_;
-
+    my $app = MT->instance;
+    my $opt = $app->options();
     my %populated;
 
     my @object_hashes;
@@ -208,6 +221,7 @@ sub _populate_obj_to_merge {
     my $instructions = MT->registry('merge_instructions');
     foreach my $obj_type (keys %$types) {
         next if $obj_type =~ /\w+\.\w+/; # skip subclasses
+
         my $class             = MT->model( $obj_type );
         next unless $class and $class->has_column('blog_id'); # Nothing to merge
         $classes_seen{$class} = 1;                      # Note class for logging
@@ -215,52 +229,57 @@ sub _populate_obj_to_merge {
         my $order             = $type_inst->{order} ? $type_inst->{order} : 500;
 
         # Skip object types marked as skip or those we've already dealt with
-        next if $type_inst->{skip} or exists $populated{"$class"};
+        next if $type_inst->{skip} or exists $populated{$class};
 
+        my $hdlr = $type_inst->{handler} ;
         my $terms_args = $class->can('merge_terms_args')
                       || $pkg->can('merge_terms_args');
         push @object_hashes, {
-            $class => $terms_args->( $blog_id ),
+            $class => {
+                $terms_args->( $blog_id ),
+                ($hdlr ? (handler => $hdlr) : ()),
+            },
             order  => $order
         };
         $populated{ $class } = 1;
     }
 
-    @object_hashes = sort { $a->{order} <=> $b->{order} } @object_hashes;
-    my @obj_to_merge;
-    foreach my $hash ( @object_hashes ) {
-        delete $hash->{order};
-        push @obj_to_merge, $hash;
-    }
-    return \@obj_to_merge;
+    @object_hashes = map { delete $_->{order}; $_ } 
+                        sort { $a->{order} <=> $b->{order} } @object_hashes;
+    return \@object_hashes;
 }
 
 sub merge_terms_args {
     my ( $blog_id ) = @_;
-    return {
+    return (
         terms       => ($blog_id ? { blog_id => $blog_id } : ()),
         args        => { no_class => 1 },
-    };
+    );
 }
     
-sub handler_category {
-    die "Not yet implemented";
-    # my 
-    # $opt->{catcsv} = $fh;
-}
-
-
 1;
 
 
 package MT::Object;
 
-sub merge_operation {
+sub blog_merge_handler {
+    my ( $pkg, $mode, $loader, $src, $target, $reporter ) = @_;
+    return $pkg->count( @$loader ) if $mode eq 'count';
+    my $cnt = 0;
+    my $iter = $pkg->load_iter( @$loader );
+    while ( my $obj = $iter->() ) {
+        $reporter->(++$cnt);
+        $obj->switch_blogs( $src, $target ) unless $mode eq 'merge-report'
+    }
+    return $cnt;
+}
+
+sub switch_blogs {
     my ( $obj, $src, $target ) = @_;
     $obj->blog_id( $target->id );
     unless ( $obj->save ) {
         $logger ||= MT::Log::Log4perl->new();
-        $logger->logerror(
+        $logger->error(
             sprintf "Save error for %s object: ", ref $obj, $obj->errstr
         );
     }
@@ -269,13 +288,13 @@ sub merge_operation {
 
 package MT::Entry;
 
-sub merge_operation {
+sub switch_blogs {
     my ( $obj, $src, $target ) = @_;
     my $oldlink = $obj->permalink;
     $obj->blog_id( $target->id );
     unless ( $obj->save ) {
         $logger ||= MT::Log::Log4perl->new();
-        $logger->logerror(
+        $logger->error(
             sprintf "Save error for %s object: ", ref $obj, $obj->errstr
         );
     }
@@ -290,13 +309,13 @@ sub merge_operation {
 
 package MT::Asset;
 
-sub merge_operation {
+sub switch_blogs {
     my ( $obj, $src, $target ) = @_;
     my $oldlink = $obj->url;
     $obj->blog_id( $target->id );
     unless ( $obj->save ) {
         $logger ||= MT::Log::Log4perl->new();
-        $logger->logerror(
+        $logger->error(
             sprintf "Save error for %s object: ", ref $obj, $obj->errstr
         );
     }
@@ -310,7 +329,7 @@ sub merge_operation {
 
 package MT::Association;
 
-sub merge_operation {
+sub switch_blogs {
     my ( $obj, $src, $target ) = @_;
     my $holder = $obj->user() || $obj->group();
     my $role   = $obj->role();
@@ -320,9 +339,118 @@ sub merge_operation {
 
 package MT::Permission;
 
-sub merge_operation {
+sub switch_blogs {
     my ( $obj, $src, $target ) = @_;
     $obj->rebuild();
+}
+
+package MT::Category;
+
+use MT::Log::Log4perl qw(l4mtdump); use Log::Log4perl qw( :resurrect );
+
+sub blog_merge_handler {
+    my ( $pkg, $mode, $loader, $src, $target, $reporter ) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    my $app            = MT->instance;
+    my $opt            = $app->options();
+    my $csv            = $opt->{csv};
+    my $fh             = $opt->{csvfh};
+    my $cnt            = 0;
+    $logger ||= MT::Log::Log4perl->new();
+    my ( @records, @missing_categories, @placement_updates );
+
+    seek( $fh, 0, 0 );
+    while ( my $row = $csv->getline( $fh ) ) {
+        # print $csv->string();
+        $cnt += 1 + @$row - 2;
+        next if $mode eq 'count';
+        my ($canon, @cats);
+        my $rec = {
+            label    => shift @$row,
+            id       => shift @$row,
+            mergeids => $row,
+        };
+        # If we're provided with a category ID in field two,
+        # load it as the canonical category.
+        if ( $rec->{id} ) {
+            ( $canon ) = $pkg->load( $rec->{id}, { no_class => 1 } );
+            if ( ! $canon ) {
+                push( @missing_categories, { %$rec, row => $csv->string() });
+                my $msg = 'No category matched ID '. $rec->{id} .'. '
+                        . 'Creating a new one with the label "'.$rec->{label}
+                        .'". Line: '.$csv->string()."\n";
+                $logger->warn($msg);
+            }
+        }
+        # If no category ID is provided in field two, search for it by label
+        # first in the target blog and then in the source blog.
+        else {
+            my $terms = [
+                   { blog_id => $target->id, label => $rec->{label} }
+                => '-or'
+                => { blog_id => $src->id,    label => $rec->{label} } 
+            ];
+            @cats = $pkg->load( $terms, { no_class => 1 });
+            foreach my $bid ( $target->id, $src->id ) {
+                ( $canon ) = grep { $_->blog_id == $bid } @cats;
+                last if $canon;
+            }
+        }
+
+        # If we still do not have a canonical category,
+        # create it using the ID in field one if provided
+        $canon ||= $pkg->new();
+        $canon->id( $rec->{id} ) if $rec->{id} and ! $canon->id;
+        # ###l4p $logger->debug('$canon: ', l4mtdump($canon));
+
+        # Update our canonical category with the label
+        # from field one and the target blog ID and save.
+        $canon->label( $rec->{label} );
+        $canon->blog_id( $target->id );
+        unless ( $mode eq 'merge-report' ) {
+            $canon->save or die "Category save error: ".$canon->errstr;
+        }
+        push( @placement_updates, { 
+            canon_id  => $canon->id, 
+            blog_id   => $target->id, 
+            merge_ids => $rec->{mergeids},
+        });
+    }
+    $csv->eof or $csv->error_diag();
+    $app->request( 'merge_placement_updates', \@placement_updates )
+        if @placement_updates;
+    # TODO Delete @mergeid cats (maybe)
+    return $cnt;
+}
+
+package MT::Placement;
+
+use MT::Log::Log4perl qw(l4mtdump); use Log::Log4perl qw( :resurrect );
+
+sub blog_merge_handler {
+    my ( $pkg, $mode, $loader, $src, $target, $reporter ) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    my $app     = MT->instance;
+    my $updates = $app->request('merge_placement_updates') || [];
+    $logger->debug('$updates: ', l4mtdump($updates));    
+    my $cnt     = 0;
+    foreach my $update ( @$updates ) {
+        $cnt += 1 + @{ $update->{merge_ids} };
+        next if $mode eq 'count';
+        my $plc_terms = [];
+        push( @$plc_terms, { category_id => $_ } )
+            foreach ( $update->{canon_id}, @{ $update->{merge_ids} } );
+        my $plc_iter = $pkg->load_iter( $plc_terms );
+        while ( my $plc = $plc_iter->() ) {
+            $plc->blog_id(      $update->{blog_id}  );
+            $plc->category_id(  $update->{canon_id} );
+            unless ( $mode eq 'merge-report' ) {
+                $plc->save
+                    or warn "Error saving category placement: ".$plc->errstr;
+            }
+        }
+    }
+    return $cnt;
 }
 
 __END__

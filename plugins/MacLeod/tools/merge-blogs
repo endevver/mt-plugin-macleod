@@ -24,6 +24,8 @@ Options:
 
   --perms      Also merge user/group associations (i.e. permissions)
   --cats FILE  Also merge categories/folders, w/ optional CSV control file
+  --catscheck FILE  
+               Skip all merge steps, test the category CSV map file then quit
   --dryrun     Run through without modifying anything
   --force      Don't prompt for confirmation of actions
   --verbose    Output more progress information
@@ -128,13 +130,14 @@ The target blog will have the following after the merge:
 
 =item --cats CSVFILE
 
-B<NOTE: This feature does not yet handle Folders and will gracefully
-exit if it detects Folders in either source or target blogs.>
+B<NOTE: This feature currently views categories and folders as one so if
+you have folders in either the source or target blog, you must specify
+their treatment as well.>
 
 If the C<--cats> flag is followed by a file path to a CSV-formatted file,
 the system will use the file to inform the merge allowing you to completely
-control the final set of categories.  The CSV file should have the
-following fields:
+control the final set of categories.  The CSV file has the following 
+structure:
 
 =over 4
 
@@ -142,21 +145,30 @@ following fields:
 
 =item 2. Existing category ID
 
-=item 3. Other category IDs to merge into this category
+=item 3-Nth. Other category IDs to merge into this category
 
-If only the B<Final category label> is provided, the system checks the target blog first then the source blog.  The first exact match found becomes the merged blog's category of record for that label.  This is similar to the default behavior of the C<--cats> flag.
+=back
 
-If you want to reverse the functionality and specify that the B<source blog's> category should be the official category, you can specify its category ID in field two. Any category in the target blog with the identical label will be collapsed into it.
+In processing the CSV file, the system will load the category ID in field
+2, update its C<blog_id> property and set the label to the value of field 1.
+It will then proceed to update the placement records for the category in
+hand as well as those associated with the category IDs in fields 3 and higher.
+After updating the placement records, it will delete the now-empty
+categories in fields 3-N.
 
-As stated above, when no CSV file is provided, categories with the same label are collapsed into the target blog's category.  However, using a CSV file, you can B<reverse> that by including in field two the ID of the category in the B<source blog>.
+If only the B<Final category label> field has a value, the system will
+search the target blog and the source blog (in that order) for a matching
+category/folder, using the first one found with an exactly matching label as
+the canonical category in the process above.  If neither blog contains an
+exactly matching category, a new category is created.
 
-If the second field is null, the system will look for the category first in
-the target blog and then in the source blog.  If found in neither location,
-a new category with that label will be created.
+To be clear, fields three and higher are only useful to merge into the
+canonical category, categories with different labels because an identically labelled category will be automatically absorbed into the canonical one.
 
-If an existing category ID B<is> specified in the second field, the third field is only necessary for merging in categories which do not have the same category label.
-
-Any category or folder in the source or target blogs not specified by label or ID in one of the three fields is deleted and will not appear in the merged blog
+At the end of the process, any category or folder in the source or target
+blogs that is not processed (with the above methodology) as either a
+canonical category or a category to be merged is deleted and will not appear
+in the merged blog
 
 
 =back

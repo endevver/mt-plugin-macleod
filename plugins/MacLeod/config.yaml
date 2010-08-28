@@ -40,7 +40,6 @@ merge_instructions:
     category:
         skip: 1
         order: 510
-        handler: $MacLeod::MacLeod::Tool::BlogMerge::handler_category
     placement:
         skip: 1
         order: 520
