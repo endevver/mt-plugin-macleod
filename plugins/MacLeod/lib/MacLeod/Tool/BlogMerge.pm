@@ -362,8 +362,10 @@ sub blog_merge_handler {
     seek( $fh, 0, 0 );
     while ( my $row = $csv->getline( $fh ) ) {
         # print $csv->string();
-        $cnt += 1 + @$row - 2;
-        next if $mode eq 'count';
+        if ( $mode eq 'count' ) {
+            $cnt += 1 + @$row - 2;
+            next;
+        }
         my ($canon, @cats);
         my $rec = {
             label    => shift @$row,
@@ -397,6 +399,10 @@ sub blog_merge_handler {
             }
         }
 
+        next if $canon and $canon->id == $rec->{id}
+                       and $canon->label eq $rec->{label}
+                       and $canon->blog_id == $target->id;
+                       
         # If we still do not have a canonical category,
         # create it using the ID in field one if provided
         $canon ||= $pkg->new();
@@ -409,6 +415,7 @@ sub blog_merge_handler {
         $canon->blog_id( $target->id );
         unless ( $mode eq 'merge-report' ) {
             $canon->save or die "Category save error: ".$canon->errstr;
+            $cnt++;
         }
         push( @placement_updates, { 
             canon_id  => $canon->id, 
@@ -435,18 +442,29 @@ sub blog_merge_handler {
     $logger->debug('$updates: ', l4mtdump($updates));    
     my $cnt     = 0;
     foreach my $update ( @$updates ) {
-        $cnt += 1 + @{ $update->{merge_ids} };
-        next if $mode eq 'count';
+        if ( $mode eq 'count' ) {
+            $cnt += 1 + @{ $update->{merge_ids} };
+            next;
+        }
         my $plc_terms = [];
         push( @$plc_terms, { category_id => $_ } )
             foreach ( $update->{canon_id}, @{ $update->{merge_ids} } );
         my $plc_iter = $pkg->load_iter( $plc_terms );
         while ( my $plc = $plc_iter->() ) {
+            next if $plc->blog_id     == $update->{blog_id}
+                and $plc->category_id == $update->{canon_id};
             $plc->blog_id(      $update->{blog_id}  );
             $plc->category_id(  $update->{canon_id} );
-            unless ( $mode eq 'merge-report' ) {
-                $plc->save
-                    or warn "Error saving category placement: ".$plc->errstr;
+            if ( $mode eq 'merge-report' ) {
+                $cnt++;
+            }
+            else {
+                if ($plc->save) {
+                    $cnt++;
+                }
+                else {
+                    warn "Error saving category placement: ".$plc->errstr;
+                }
             }
         }
     }
