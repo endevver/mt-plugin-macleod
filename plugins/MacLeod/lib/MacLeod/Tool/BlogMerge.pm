@@ -2,7 +2,7 @@ package MacLeod::Tool::BlogMerge;
 use strict; use warnings; use Carp; use Data::Dumper;
 
 use vars qw( $VERSION );
-$VERSION = '1.0';
+$VERSION = '1.1';
 
 use Pod::Usage;
 use File::Spec;
