@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 use strict;
 BEGIN { unshift @INC, qw( lib extlib ../../lib ../../extlib plugins/MacLeod/lib ) }
-use MT::Bootstrap::CLI App => 'MacLeod::Tool::BlogMerge';
+use MT::Bootstrap::CLI App => 'MacLeod::Tool::BlogList';
 
 __END__
 
 =head1 NAME
 
-merge-blogs - Transfer content/associations from one blog to another
+list-blogs - List blogs matching user specifications
 
 =head1 VERSION
 
@@ -17,19 +17,15 @@ You can always find the latest version of the plugin and documentation at:
 
 =head1 SYNOPSIS
 
-Usage: merge-blogs [options] SRC_BLOG TARGET_BLOG
+Usage: list-blogs [options]
 
 Options:
 
-  --perms      Also merge user/group associations (i.e. permissions)
-  --cats FILE  Also merge categories/folders, w/ optional CSV control file
-  --catscheck FILE  
-               Skip all merge steps, test the category CSV map file then quit
-  --dryrun     Run through without modifying anything
-  --force      Don't prompt for confirmation of actions
-  --verbose    Output more progress information
-  --man        Output the man page for the utility
-  --help       Output this message
+  --cols      Comma-separated list of columns to show in output. 
+              Default is "id,name,site_url"
+  --verbose   Output more progress information
+  --man       Output the man page for the utility
+  --help      Output this message
 
 Example:
 

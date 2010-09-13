@@ -1,0 +1,124 @@
+#!/usr/bin/perl -w
+use strict;
+BEGIN { unshift @INC, qw( lib extlib ../../lib ../../extlib plugins/MacLeod/lib ) }
+use MT::Bootstrap::CLI App => 'MacLeod::Tool::BlogDelete';
+
+__END__
+
+=head1 NAME
+
+delete-blogs - Delete blogs based on user specifications
+
+=head1 VERSION
+
+You can always find the latest version of the plugin and documentation at:
+
+  http://github.com/endevver/mt-plugin-macleod
+
+=head1 SYNOPSIS
+
+Usage: delete-blogs [options] BLOG_NAME_PATTERN
+
+Options:
+
+  --force     Don't prompt for confirmation of actions
+  --cols      Comma-separated list of columns to show in output.
+              Default is "id,name,site_url"
+  --verbose   Output more progress information
+  --man       Output the man page for the utility
+  --help      Output this message
+
+Example:
+
+  cd /path/to/mt_dir
+  export MT_HOME="$(pwd)"
+  mysqldump [options] DATABASE > mt-DATABASE-backup.sql
+  ./plugins/MacLeod/tools/delete-blogs ".*'s blog"
+
+=head1 DESCRIPTION
+
+For a high-level overview of this plugin and command-line utility, please see:
+
+  http://github.com/endevver/mt-plugin-macleod#readme
+
+=head2 IMPORTANT CAVEATS
+
+This is an B<extremely powerful utility> with absolutely no facility for
+rollback. Although we believe it to be entirely reliable, even the
+developers of this plugin back up their database before running it or any
+utility of its kind. If you don't back up your database and it gets hosed
+because of a bug or because you accidentally selected the wrong options,
+there's really only one person to blame and it's not the creator of this
+software.
+
+=head1 OPTIONS
+
+The following command-line options are supported by the utility.
+
+=item --force
+
+Normally, the utility will output exactly what it's about to do and then
+prompt you for confirmation that you want to continue.  The C<--force>
+flag skips this confirmation and simply performs the action specified
+by the provided flags and arguments.
+
+=item --verbose
+
+Output more progress information
+
+=item --man
+
+Output this man-formatted POD documentation.
+
+=item --help
+
+Outputs a short description of the utility's usage
+
+=back
+
+=head1 DESCRIPTION OF OPERATION
+
+=head1 DEPENDENCIES
+
+=over 4
+
+=item * Log4MT plugin - http://github.com/endevver/mt-plugin-log4mt
+
+Used for general purpose logging and recording of entry permalink redirects
+
+=item * CLITool - http://github.com/endevver/mt-util-clitool
+
+Underlying framework for all of Endevver's command-line interface (CLI) tools
+
+=back
+
+=head1 INCOMPATIBILITIES
+
+No known incompatibilities.
+
+=head1 BUGS AND LIMITATIONS
+
+There are no known bugs in this module.  
+
+If you are having problems installing or using the plugin, please check out 
+our general knowledge base and help ticket system:
+
+  http://help.endevver.com
+
+=head1 COPYRIGHT
+
+Copyright 2010, Endevver, LLC. All rights reserved.
+
+=head1 LICENSE
+
+This plugin is licensed under the GPL v2.
+
+=head1 ABOUT ENDEVVER
+
+We design and develop web sites, products and services with a focus on 
+simplicity, sound design, ease of use and community. We specialize in 
+Movable Type and offer numerous services and packages to help customers 
+make the most of this powerful publishing platform.
+
+http://endevver.com/
+
