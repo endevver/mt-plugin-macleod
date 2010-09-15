@@ -14,7 +14,7 @@ use base qw( MT::App::CLI );
 # use MacLeod::Util;
 
 $| = 1;
-our %classes_seen;
+our ( %classes_seen, $opt );
 
 sub usage { 
     return <<EOD;
@@ -42,20 +42,25 @@ sub init_options {
     # $app->show_usage() unless @ARGV;
 
     $app->SUPER::init_options(@_) or return;
-    my $opt = $app->options || {};
+    $opt = $app->options || {};
     $opt->{cols} = ref $opt->{cols} eq 'ARRAY' 
                  ? $opt->{cols} 
                  : [ split( /\s*,\s*/, ($opt->{cols} || 'id,name,site_url') )];
-    if ( @ARGV ) {
-        $opt->{ipatt} = shift @ARGV;
-    }
+
+    $opt->{ipatt} = shift @ARGV if @ARGV;
+
+    require Sub::Install;
+    Sub::Install::reinstall_sub({
+      code => 'remove_children_logged',
+      into => 'MT::Object',
+    });
+
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
     1;
 }
 
 sub mode_default {
     my $app    = shift;
-    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $opt   = $app->options();
     my $blogs = $app->blog_list();
 
@@ -106,6 +111,7 @@ sub blog_list {
 sub delete_blogs {
     my $app   = shift;
     my $blogs = shift;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $opt   = $app->options();
     my $count = 0;
     my $plugin = $app->component('MacLeod');
@@ -114,7 +120,10 @@ sub delete_blogs {
         my $status = 'DELETING';
         my $blog_line = sprintf "%-5s %-30s %s",
                             map { $blog->$_ } @{ $opt->{cols} };
-        printf STDERR "%-12s %s\n", $status, $blog_line;
+        my $update = sprintf( "%-12s %s\n", $status, $blog_line );
+        ###l4p $logger->info( $update );
+        print $update;
+
         if ($blog->remove({ nofetch => 1 })) {
             $status = 'DELETED';
             $count++;
@@ -122,33 +131,17 @@ sub delete_blogs {
         else {
             $status = 'NOT DELETED';
         }
-        printf STDERR "%-12s %s\n", $status, $blog_line;
+        $update = sprintf( "%-12s %s\n", $status, $blog_line );
+        ###l4p $logger->info( $update );
+        print $update;
     }
     return $count;
 }
 
-package MT::Object;
-
-# sub remove {
-#     my $obj = shift;
-#     my(@args) = @_;
-#     if (!ref $obj) {
-#         for my $which (qw( meta summary )) {
-#             my $meth = "remove_$which";
-#             my $has = "has_$which";
-#             $obj->$meth( @args ) if $obj->$has;
-#         }
-#         $obj->remove_scores( @args ) if $obj->isa('MT::Scorable');
-#         MT->run_callbacks($obj . '::pre_remove_multi', @args);
-#         return $obj->driver->direct_remove($obj, @args);
-#     } else {
-#         return $obj->driver->remove($obj, @args);
-#     }
-# }
-# 
-sub remove_children {
+sub remove_children_logged {
     my $obj = shift;
     return 1 unless ref $obj;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
 
     my ($param) = @_;
     my $child_classes = $obj->properties->{child_classes} || {};
@@ -161,15 +154,16 @@ sub remove_children {
     for my $class (@classes) {
         eval "# line " . __LINE__ . " " . __FILE__ . "\nno warnings 'all';require $class;";
         my $child_cnt = $class->count({ $key => $obj_id }) || 0;
-        print STDERR "REMOVING $child_cnt $class records\n";
+        if ( $opt->{verbose} ) {
+            my $msg = "REMOVING $child_cnt $class records";
+            ###l4p $logger->info( $msg );
+             print $msg."\n";
+        }
         $class->remove({ $key => $obj_id }, { nofetch => 1 });
     }
     1;
 }
 
-
 1;
 
 __END__
-
-8:30am eastern from 7:30pm eastern
