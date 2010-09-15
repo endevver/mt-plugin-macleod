@@ -159,6 +159,7 @@ sub remove_fastlog {
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     ###l4p $logger->debug("Removing $obj!");
     if (!ref $obj) {
+        print Dumper($args[1]) if $args[1];
         $args[1] ||= {};
         $args[1]->{nofetch} = 1;
         for my $which (qw( meta summary )) {
