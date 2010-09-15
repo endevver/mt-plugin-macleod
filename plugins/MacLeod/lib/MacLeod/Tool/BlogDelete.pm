@@ -52,9 +52,15 @@ sub init_options {
 
     require Sub::Install;
     Sub::Install::reinstall_sub({
-      code => 'remove_children_logged',
+      code => 'remove_children_fastlog',
       into => 'MT::Object',
       as   => 'remove_children',
+    });
+
+    Sub::Install::reinstall_sub({
+      code => 'remove_fastlog',
+      into => 'MT::Object',
+      as   => 'remove',
     });
 
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
@@ -88,7 +94,7 @@ sub confirm_delete_blogs {
     print "The following blogs will be deleted: \n";
     foreach my $blog ( @$blogs_to_delete ) {
         printf "%-5s %-30s %s\n", 
-                    map { $blog->$_ } @{ $opt->{cols} };
+                    map { $blog->$_ || 'NONE' } @{ $opt->{cols} };
     }
 
     return $app->confirm_action(
@@ -121,7 +127,7 @@ sub delete_blogs {
     foreach my $blog ( @$blogs ) {
         my $status = 'DELETING';
         my $blog_line = sprintf "%-5s %-30s %s",
-                            map { $blog->$_ } @{ $opt->{cols} };
+                            map { $blog->$_ || 'NONE' } @{ $opt->{cols} };
         my $update = sprintf( "%-12s %s\n", $status, $blog_line );
         ###l4p $logger->info( $update );
         print $update;
@@ -140,7 +146,28 @@ sub delete_blogs {
     return $count;
 }
 
-sub remove_children_logged {
+sub remove_fastlog {
+    my $obj = shift;
+    my (@args) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    ###l4p $logger->debug("Removing $obj!");
+    if (!ref $obj) {
+        $args[1] ||= {};
+        $args[1]->{nofetch} = 1;
+        for my $which (qw( meta summary )) {
+            my $meth = "remove_$which";
+            my $has = "has_$which";
+            $obj->$meth( @args ) if $obj->$has;
+        }
+        $obj->remove_scores( @args ) if $obj->isa('MT::Scorable');
+        MT->run_callbacks($obj . '::pre_remove_multi', @args);
+        return $obj->driver->direct_remove($obj, @args);
+    } else {
+        return $obj->driver->remove($obj, @args);
+    }
+}
+
+sub remove_children_fastlog {
     my $obj = shift;
     return 1 unless ref $obj;
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
