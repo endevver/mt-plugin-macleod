@@ -54,6 +54,7 @@ sub init_options {
     Sub::Install::reinstall_sub({
       code => 'remove_children_logged',
       into => 'MT::Object',
+      as   => 'remove_children',
     });
 
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
