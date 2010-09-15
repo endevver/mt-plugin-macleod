@@ -63,6 +63,13 @@ sub init_options {
       as   => 'remove',
     });
 
+    if ( $opt->{verbose} ) {
+        $app->config('DebugMode', 7);
+        require MT;
+        $MT::DebugMode = 7;
+        $app->init_debug_mode();
+    }
+
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
     1;
 }

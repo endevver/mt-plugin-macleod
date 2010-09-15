@@ -51,6 +51,13 @@ sub init_options {
 
     $opt->{verbose}++ if $opt->{dryrun};
 
+    if ( $opt->{verbose} ) {
+        $app->config('DebugMode', 7);
+        require MT;
+        $MT::DebugMode = 7;
+        $app->init_debug_mode();
+    }
+
     unless ( $opt->{srcblog} && $opt->{targetblog} ) {
         @ARGV == 2 or return $app->error(
             'You must specify two and only two blogs '
@@ -107,8 +114,6 @@ sub mode_default {
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $opt            = $app->options();
     my ($src, $target) = ( $opt->{srcblog}, $opt->{targetblog} );
-
-    $MT::DebugMode = 11 if $opt->{verbose};
 
     my $obj_to_merge = $app->_populate_obj_to_merge( $src->id );
     ###l4p $logger->debug('obj_to_merge: ', l4mtdump($obj_to_merge));
