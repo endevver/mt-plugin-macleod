@@ -23,7 +23,8 @@ Options:
     --cols      Comma-separated list of columns to show in output.
                 Default is "id,name,site_url"
     --force     Don't prompt for confirmation of actions
-    --verbose   Output more progress information
+    --verbose   Output more progress information. 
+                Can be used multiple times for more logging.
     --man       Output the man page for the utility
     --help      Output this message
 EOD
@@ -153,11 +154,17 @@ sub remove_children_logged {
     my $obj_id = $obj->id;
     for my $class (@classes) {
         eval "# line " . __LINE__ . " " . __FILE__ . "\nno warnings 'all';require $class;";
-        my $child_cnt = $class->count({ $key => $obj_id }) || 0;
-        if ( $opt->{verbose} ) {
-            my $msg = "REMOVING $child_cnt $class records";
+        my $msg;
+        if ( $opt->{verbose} > 1 ) {
+            my $child_cnt = $class->count({ $key => $obj_id }) || 0;
+            $msg = "REMOVING $child_cnt $class records";
+        }
+        elsif ( $opt->{verbose} ) {
+            $msg = "REMOVING $class records";
+        }
+        if ( $msg ) {
             ###l4p $logger->info( $msg );
-             print $msg."\n";
+            print $msg."\n" if $msg;
         }
         $class->remove({ $key => $obj_id }, { nofetch => 1 });
     }
