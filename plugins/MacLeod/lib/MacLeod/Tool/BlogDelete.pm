@@ -10,6 +10,10 @@ use Cwd qw( realpath );
 use MT::Log::Log4perl qw(l4mtdump); use Log::Log4perl qw( :resurrect );
 our $logger = MT::Log::Log4perl->new();
 
+use Devel::TraceMethods qw( __PACKAGE__ MT::Object Data::ObjectDriver::Driver::DBI );
+
+my @traced = qw( __PACKAGE__::remove_fastlog __PACKAGE__::remove_children_fastlog MT::Object::remove MT::Object::remove_meta MT::Object::remove_scores MT::Object::remove_children Data::ObjectDriver::Driver::DBI::remove Data::ObjectDriver::Driver::DBI::direct_remove Data::ObjectDriver::Driver::BaseCache::remove_from_cache Data::ObjectDriver::Driver::BaseCache::remove Data::ObjectDriver::Driver::BaseCache::uncache_object Data::ObjectDriver::Driver::Cache::Cache::remove_from_cache Data::ObjectDriver::Driver::Cache::RAM::remove_from_cache MT::Asset::remove MT::Asset::remove_cached_files MT::Association::remove MT::Association::sub rebuild_permissions MT::Trackback::remove MT::TemplateMap::remove MT::Tag::remove MT::Tag::remove_tags MT::Tag::pre_remove_tags MT::Role::remove MT::PluginData::remove MT::Entry::remove MT::Category::remove MT::Blog::remove MT::Author::remove MT::Author::remove_role MT::Author::remove_group MT::Author::remove_sessions );
+
 use base qw( MT::App::CLI );
 # use MacLeod::Util;
 
@@ -69,6 +73,12 @@ sub init_options {
         $MT::DebugMode = 7;
         $app->init_debug_mode();
     }
+
+    Devel::TraceMethods->callback(sub {
+        my ( $meth, @args ) = @_;
+        return unless grep { /$meth/ } @traced;
+        $logger->info('METH: '.$meth.', ARGS: ', l4mtdump(\@args));
+    });
 
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
     1;
@@ -797,4 +807,7 @@ sub remove_sessions {
     }
     $_->remove foreach @sess;
 }
+
+
+
 
