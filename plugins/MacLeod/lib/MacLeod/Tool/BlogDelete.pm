@@ -77,14 +77,15 @@ sub init_options {
 
 sub log_devel_tracemethods {
     my ( $meth, @args ) = @_;
-    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     return unless grep { m/$meth/ } @traced;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     $logger->info('METH: '.$meth.', ARGS: ', l4mtdump(\@args));
 }
 
 sub mode_default {
     my $app    = shift;
     my $opt   = $app->options();
+    print "Searching for blogs matching your specified pattern. It should only take a short time...\n";
     my $blogs = $app->blog_list();
     @$blogs or return "No blogs matched your specifications";
 
@@ -184,6 +185,7 @@ sub remove_fastlog {
 
 sub efficient_children {
     my $app = shift;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $child_classes = $app->request('efficient_children');
     return $child_classes if $child_classes;
 
@@ -195,12 +197,13 @@ sub efficient_children {
     # load the class, record the number of children in %child_cnt
     # and add any newly discovered child classes to %child_cnt
     # so that they will also be investigated
-    while ( my @untallied = grep { ! defined } values %child_cnt ) {
+    while ( my @untallied = grep { ! defined $child_cnt{$_} } keys %child_cnt ) {
         foreach my $class ( @untallied ) {
+print "Getting child classes for $class\n";
             eval "require $class;";
-            my $child_classes = $class->properties->{child_classes} || [];
-            $child_cnt{$class} = scalar @{ $child_classes };
-            foreach my $child ( @$child_classes ) {
+            my $child_classes = $class->properties->{child_classes} || {};
+            $child_cnt{$class} = scalar keys %{ $child_classes };
+            foreach my $child ( keys %$child_classes ) {
                 next if exists $child_cnt{$child};
                 $child_cnt{$child} = undef;
             }
@@ -212,7 +215,7 @@ sub efficient_children {
     my $efficient_delete_order = [
         sort { $child_cnt{$a} <=> $child_cnt{$b} } keys %child_cnt
     ];
-    $logger->debug('$efficient_delete_order: ',
+    $logger->info('$efficient_delete_order: ',
         l4mtdump($efficient_delete_order));
     $app->request( 'efficient_children', $efficient_delete_order );
     die;
