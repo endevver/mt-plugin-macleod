@@ -71,12 +71,12 @@ sub init_options {
       as   => 'remove',
     });
 
-    if ( $opt->{verbose} ) {
-        $app->config('DebugMode', 7);
-        require MT;
-        $MT::DebugMode = 7;
-        $app->init_debug_mode();
-    }
+    $app->init_debug_mode() if $opt->{verbose};
+}
+
+sub init_debug_mode {
+    
+}
 
     Devel::TraceMethods->callback(sub {
         my ( $meth, @args ) = @_;
@@ -92,7 +92,6 @@ sub mode_default {
     my $app    = shift;
     my $opt   = $app->options();
     my $blogs = $app->blog_list();
-
     @$blogs or return "No blogs matched your specifications";
 
     my $continue = $opt->{force};
@@ -189,14 +188,52 @@ sub remove_fastlog {
     }
 }
 
+sub efficient_children {
+    my $app = shift;
+    my $child_classes = $app->request('efficient_children');
+    return $child_classes if $child_classes;
+
+    # Since we're deleting blogs, we'll start with MT::Blog
+    # and set the child count initially to undefined
+    my %child_cnt = ( 'MT::Blog' => undef );
+
+    # For any values of %child_cnt that are still undefined,
+    # load the class, record the number of children in %child_cnt
+    # and add any newly discovered child classes to %child_cnt
+    # so that they will also be investigated
+    while ( my @untallied = grep { ! defined } values %child_cnt ) {
+        foreach my $class ( @untallied ) {
+            eval "require $class;";
+            my $child_classes = $class->properties->{child_classes} || [];
+            $child_cnt{$class} = scalar @{ $child_classes };
+            foreach my $child ( @$child_classes ) {
+                next if exists $child_cnt{$child};
+                $child_cnt{$child} = undef;
+            }
+        }
+        $logger->info('%child_cnt: ', l4mtdump(\%child_cnt));
+        $logger->info('Untallied: '. join(', ', @untallied));
+    }
+
+    my $efficient_delete_order = [
+        sort { $child_cnt{$a} <=> $child_cnt{$b} } keys %child_cnt
+    ];
+    $logger->debug('$efficient_delete_order: ',
+        l4mtdump($efficient_delete_order));
+    $app->request( 'efficient_children', $efficient_delete_order );
+    die;
+    return $efficient_delete_order;
+}
+
 sub remove_children_fastlog {
     my $obj = shift;
     return 1 unless ref $obj;
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
 
-    my ($param) = @_;
-    my $child_classes = $obj->properties->{child_classes} || {};
-    my @classes = keys %$child_classes;
+    my ($param)         = @_;
+    my $classes_ordered = MT->instance->efficient_children() || [];
+    my $child_classes   = $obj->properties->{child_classes} || {};
+    my @classes         = grep { exists $child_classes->{$_} } @$classes_ordered;
     return 1 unless @classes;
 
     $param ||= {};
