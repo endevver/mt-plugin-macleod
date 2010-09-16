@@ -136,7 +136,7 @@ sub blog_list {
 sub delete_blogs {
     my $app   = shift;
     my $blogs = shift;
-    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();s
     my $opt   = $app->options();
     my $count = 0;
     my $plugin = $app->component('MacLeod');
