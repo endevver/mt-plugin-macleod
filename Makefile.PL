@@ -2,6 +2,6 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME            => 'MacLeod Plugin',
-    VERSION         => '1.1',
+    VERSION         => '1.2.3',
     DISTNAME        => 'MacLeod',
 );
