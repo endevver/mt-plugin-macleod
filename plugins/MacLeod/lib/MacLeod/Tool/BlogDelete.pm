@@ -216,7 +216,7 @@ print "Getting child classes for $class\n";
         sort { $child_cnt{$a} <=> $child_cnt{$b} } keys %child_cnt
     ];
     $logger->info('$efficient_delete_order: ',
-        l4mtdump($efficient_delete_order));
+        l4mtdump({ map { $_ => $child_cnt{$_} } @$efficient_delete_order }));
     $app->request( 'efficient_children', $efficient_delete_order );
     die;
     return $efficient_delete_order;
