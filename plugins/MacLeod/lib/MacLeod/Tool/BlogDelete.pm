@@ -10,11 +10,11 @@ use Cwd qw( realpath );
 use MT::Log::Log4perl qw(l4mtdump); use Log::Log4perl qw( :resurrect );
 our $logger = MT::Log::Log4perl->new();
 
-# use Devel::TraceMethods qw( __PACKAGE__ Data::ObjectDriver::Driver::DBI             Data::ObjectDriver::Driver::BaseCache
-# Data::ObjectDriver::Driver::Cache::Cache    Data::ObjectDriver::Driver::Cache::RAM
-# MT::Object  MT::Asset       MT::Association  MT::Trackback  MT::TemplateMap  MT::Tag
-# MT::Role    MT::PluginData  MT::Entry        MT::Category   MT::Blog    MT::Author
-#  );
+use Devel::TraceMethods qw( __PACKAGE__ Data::ObjectDriver::Driver::DBI             Data::ObjectDriver::Driver::BaseCache
+Data::ObjectDriver::Driver::Cache::Cache    Data::ObjectDriver::Driver::Cache::RAM
+MT::Object  MT::Asset       MT::Association  MT::Trackback  MT::TemplateMap  MT::Tag
+MT::Role    MT::PluginData  MT::Entry        MT::Category   MT::Blog    MT::Author
+ );
 
 my @traced = qw( __PACKAGE__::remove_fastlog __PACKAGE__::remove_children_fastlog MT::Object::remove MT::Object::remove_meta MT::Object::remove_scores MT::Object::remove_children Data::ObjectDriver::Driver::DBI::remove Data::ObjectDriver::Driver::DBI::direct_remove Data::ObjectDriver::Driver::BaseCache::remove_from_cache Data::ObjectDriver::Driver::BaseCache::remove Data::ObjectDriver::Driver::BaseCache::uncache_object Data::ObjectDriver::Driver::Cache::Cache::remove_from_cache Data::ObjectDriver::Driver::Cache::RAM::remove_from_cache MT::Asset::remove MT::Asset::remove_cached_files MT::Association::remove MT::Association::sub rebuild_permissions MT::Trackback::remove MT::TemplateMap::remove MT::Tag::remove MT::Tag::remove_tags MT::Tag::pre_remove_tags MT::Role::remove MT::PluginData::remove MT::Entry::remove MT::Category::remove MT::Blog::remove MT::Author::remove MT::Author::remove_role MT::Author::remove_group MT::Author::remove_sessions );
 
@@ -71,14 +71,15 @@ sub init_options {
       as   => 'remove',
     });
 
-    # Devel::TraceMethods->callback(sub {
-    #     my ( $meth, @args ) = @_;
-    #     return unless grep { /$meth/ } @traced;
-    #     $logger->info('METH: '.$meth.', ARGS: ', l4mtdump(\@args));
-    # });
-
     ###l4p $logger->debug('$opt: ', l4mtdump( $opt ));
     1;
+}
+
+sub log_devel_tracemethods {
+    my ( $meth, @args ) = @_;
+    ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
+    return unless grep { m/$meth/ } @traced;
+    $logger->info('METH: '.$meth.', ARGS: ', l4mtdump(\@args));
 }
 
 sub mode_default {
@@ -226,9 +227,10 @@ sub remove_children_fastlog {
     my ($param)         = @_;
     my $classes_ordered = MT->instance->efficient_children() || [];
     my $child_classes   = $obj->properties->{child_classes} || {};
-    my @classes         = grep { exists $child_classes->{$_} }
-                                                @$classes_ordered;
+    my @classes
+        = grep { exists $child_classes->{$_} } @$classes_ordered;
     return 1 unless @classes;
+    $logger->info('Classes processing: '.join(', ', @classes));
 
     $param ||= {};
     my $key = $param->{key} || $obj->datasource . '_id';

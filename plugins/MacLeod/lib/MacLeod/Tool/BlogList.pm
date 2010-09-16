@@ -54,8 +54,6 @@ sub mode_default {
     ###l4p $logger ||= MT::Log::Log4perl->new(); $logger->trace();
     my $opt            = $app->options();
 
-    $MT::DebugMode = 63 if $opt->{verbose};
-
     my $blogs = $app->blog_list();
     my @out;
     foreach my $blog (@$blogs) {

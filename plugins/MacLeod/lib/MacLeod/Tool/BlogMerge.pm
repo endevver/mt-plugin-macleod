@@ -51,13 +51,6 @@ sub init_options {
 
     $opt->{verbose}++ if $opt->{dryrun};
 
-    if ( $opt->{verbose} ) {
-        $app->config('DebugMode', 7);
-        require MT;
-        $MT::DebugMode = 7;
-        $app->init_debug_mode();
-    }
-
     unless ( $opt->{srcblog} && $opt->{targetblog} ) {
         @ARGV == 2 or return $app->error(
             'You must specify two and only two blogs '
