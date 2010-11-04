@@ -22,6 +22,8 @@ Though it seems inconceivable that an explanation would be necessary, the name o
 
 * Designed to search for, discover and intelligently facilitate the transfer of data from arbitrary object types and classes (e.g. data from third-party plugins).
 
+* Supports merging of categories and their placement records as directed by a user-customized CSV file. This functionality requires the Text::CSV perl module and is executed under a different run mode as well as a third which does nothing but verify the CSV file. Unfortunately, the documentation here on GitHub is lacking as this was designed to the commissioning client's spec.  If you need guidance before I complete it, drop me a line.
+
 * Brief and lengthy documentation of the [command line utility](http://github.com/endevver/mt-plugin-macleod/blob/master/plugins/MacLeod/tools/merge-blogs) via the `help` and `man` flags
 
 ## Installation ##
@@ -48,7 +50,6 @@ The following plugins/utilities are required for proper operation:
 
 You can see a full list of the data types **not handled** by the system in the [config.yaml](http://github.com/endevver/mt-plugin-macleod/blob/master/plugins/MacLeod/config.yaml).  In general, the only blog-specific content not currently handled is:
 
-* **Categories** - `MT::Category` and `MT::Placement` records.  This is currently pending functionality which will be added in the future
 * **Templates** - `MT::Template` and `MT::TemplateMap` records. This was omitted because we questioned the need for it.  The new blog already has templates and we believe that most users would not want to move all of the templates *en masse* into the target blog.  We may develop a method to easily migrate selected templates upon users' requests.
 * **Session, FileInfo and TheSchwartz records** - These are temporal and regenerated automatically as needed
 
@@ -58,7 +59,7 @@ If you are having problems installing or using the plugin, please check out our 
 
 ## Future Plans ##
 
-This plugin was quickly put together to satisfy a single use case for a client.  In the future, it will certainly be expanded (and properly named) to facilitate mobility of individual pieces of content, all objects from individual object classes (e.g. templates, categories, associations, etc) and metadata between blogs.
+This plugin was quickly put together to satisfy a single use case for a client.  In the future, it will certainly be expanded (and properly named) to facilitate mobility of individual pieces of content, all objects from individual object classes (e.g. templates, associations, etc) and metadata between blogs.
 
 ## Copyright ##
 
